@@ -116,10 +116,8 @@ fi
 
 cat <<'EOT'
 
-Done. Also set in Steam > Move or Die > Properties:
-  Controller:     Disable Steam Input
-  Launch Options: SDL_JOYSTICK_HIDAPI_STEAM=1 SDL_GAMECONTROLLER_IGNORE_DEVICES= %command%
-(see README.md for hiding non-gamepad devices that show up as joysticks)
+Done. Start the game from Steam as usual. README.md describes optional Launch Options
+(hiding non-gamepad devices, Steam Controller without Steam Input).
 Avoid the in-game "controller mapping" screen, it writes broken mappings again
 (just run ./fix.sh again if it happens).
 EOT

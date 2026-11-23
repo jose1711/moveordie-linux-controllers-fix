@@ -38,8 +38,7 @@
    reads raw buttons, which is why the pad seems to "work" there.
 
 3. **Steam Controller via Steam Input.** The virtual pad created by Steam Input
-   (`28de:11ff`) suffers from (2) too. Letting SDL talk to the controller directly (HIDAPI)
-   avoids it.
+   (`28de:11ff`) suffers from (2) too.
 
 ## Fix
 
@@ -66,29 +65,36 @@ The script
   Xbox 360 layout, other empty entries are removed (SDL's built-in mapping applies), glued
   `platform:Linuxa:b0` entries are fixed.
 
-Then, in Steam → Move or Die → Properties:
+That is all that is needed. With Steam Input left **on**, a Steam Controller works through
+Steam's virtual pad (`28de:11ff`, "Microsoft X-Box 360 pad N") once its mapping entry is
+repaired – tested started from Steam.
 
-- **Controller:** *Disable Steam Input*. With Steam Input on, Steam adds its virtual pads
-  (`28de:11ff`, affected by cause 2), which may also duplicate pads the game already sees.
-- **Launch Options:**
+The number *N* in the virtual pad's name can change between sessions, which changes its GUID.
+If such a pad can't join again, quit the game and run `./fix.sh` again.
+
+Optional Launch Options (Steam → Move or Die → Properties):
+
+- Hide a non-gamepad device that shows up as a joystick (e.g. the ErgoDox EZ "System Control"
+  interface, `3297:4975`; comma-separated `0xVID/0xPID` list):
+
+  ```
+  SDL_JOYSTICK_BLACKLIST_DEVICES=0x3297/0x4975 %command%
+  ```
+
+  (tested from Steam; `SDL_GAMECONTROLLER_IGNORE_DEVICES=0x3297/0x4975` also hides it, but
+  replaces the list Steam sets.)
+
+- Alternative for a Steam Controller without Steam Input – set *Controller: Disable Steam
+  Input* and
 
   ```
   SDL_JOYSTICK_HIDAPI_STEAM=1 SDL_GAMECONTROLLER_IGNORE_DEVICES= %command%
   ```
 
-  `SDL_JOYSTICK_HIDAPI_STEAM=1` lets SDL drive the Steam Controller directly.
-  `SDL_GAMECONTROLLER_IGNORE_DEVICES` replaces the list Steam sets, which hides the real
-  Steam Controller (`0x28de/0x1106`) from the game completely.
-
-  If some non-gamepad device shows up as a joystick (e.g. the ErgoDox EZ "System Control"
-  interface, `3297:4975`), put it into that list instead of leaving it empty
-  (comma-separated `0xVID/0xPID`):
-
-  ```
-  SDL_JOYSTICK_HIDAPI_STEAM=1 SDL_GAMECONTROLLER_IGNORE_DEVICES=0x3297/0x4975 %command%
-  ```
-
-  `SDL_JOYSTICK_BLACKLIST_DEVICES=0x3297/0x4975` works as well.
+  SDL then drives the controller directly (HIDAPI); the empty
+  `SDL_GAMECONTROLLER_IGNORE_DEVICES` clears Steam's list, which would hide the real Steam
+  Controller (`0x28de/0x1106`). Tested only with the game started directly in the Steam Linux
+  Runtime, not from Steam.
 
 Notes:
 
@@ -98,9 +104,7 @@ Notes:
   `./fix.sh` again.
 - Tested with 2× 8BitDo SN30 Pro (Bluetooth, X-input), Steam Controller (BLE) and SPEEDLINK
   TORID (X-input receiver, `045e:028e`) at the same time, Steam Linux Runtime soldier
-  2.0.20261021, Arch Linux. In that test the game was started directly in the Steam Linux
-  Runtime with the variables above; starting it from Steam with the settings above is not
-  tested yet.
+  2.0.20261021, Arch Linux, game started from Steam with Steam Input on.
 
 No game files are distributed in this repository.
 
@@ -126,13 +130,13 @@ reagujú v mapovaní ovládania, ale na výbere hráča sa pridať nedajú.
 - Hra si ukladá vlastné mapovania do `~/.local/share/love/Move Or Die/usercontrollerdb.txt`
   a s GUID novšieho SDL (pole `crc:`) ich zapíše pokazené, často úplne bez tlačidiel. Takýto
   pad sa na výbere hráča nepridá.
-- Virtuálny pad Steam Input trpí tým istým, Steam Controller je lepšie pripojiť priamo cez
-  HIDAPI.
+- Virtuálny pad Steam Input (Steam Controller) trpí tým istým.
 
 **Riešenie:** `./fix.sh` odsunie pribalenú SDL (hra potom použije SDL 2.32 zo Steam Runtime)
-a opraví `usercontrollerdb.txt` (so zálohou). V Steame vypni pre hru Steam Input a do Launch
-Options daj `SDL_JOYSTICK_HIDAPI_STEAM=1 SDL_GAMECONTROLLER_IGNORE_DEVICES= %command%`.
-Zariadenie, ktoré hra považuje za joystick, hoci ním nie je (napr. ErgoDox `3297:4975`),
-skryješ tak, že ho dáš do toho zoznamu: `SDL_GAMECONTROLLER_IGNORE_DEVICES=0x3297/0x4975`.
+a opraví `usercontrollerdb.txt` (so zálohou). Viac netreba, Steam Controller ide aj so
+zapnutým Steam Input (otestované so spustením zo Steamu). Zariadenie, ktoré hra považuje za
+joystick, hoci ním nie je (napr. ErgoDox `3297:4975`), skryješ v Launch Options:
+`SDL_JOYSTICK_BLACKLIST_DEVICES=0x3297/0x4975 %command%`. Ak sa virtuálny pad Steamu po čase
+znova nedá pridať (mení sa jeho meno, a tým GUID), spusti `./fix.sh` znova.
 Mapovanie ovládania v hre nepoužívaj. Po update hry alebo overení súborov v Steame spusti
 skript znova. Návrat: `./fix.sh --restore` (vráti SDL aj mapovania spred prvého spustenia).
