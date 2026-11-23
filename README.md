@@ -48,7 +48,7 @@ git clone https://github.com/jose1711/moveordie-linux-controllers-fix
 cd moveordie-linux-controllers-fix
 ./fix.sh                        # auto-detects the game in your Steam libraries
 ./fix.sh "/path/to/steamapps/common/Move or Die"
-./fix.sh --restore              # put the bundled SDL and the last mappings backup back
+./fix.sh --restore              # put back the bundled SDL and the mappings from before the first run
 ```
 
 The script
@@ -57,28 +57,38 @@ The script
   sha256 `61bd049e…21adb2`). The game then loads SDL 2.32 from the Steam Linux Runtime
   (`/usr/lib/i386-linux-gnu/libSDL2-2.0.so.0` inside the container) – with udev-less hotplug,
   HIDAPI drivers and no 32-device limit;
-- repairs `usercontrollerdb.txt`, keeping a timestamped backup: empty entries of X-input pads
+  If Steam has put the file back (update, *Verify integrity*) and the `.orig` backup already
+  exists, the restored copy is removed;
+- repairs `usercontrollerdb.txt`: the state before the first run is kept as
+  `usercontrollerdb.txt.orig` (used by `--restore`), plus a timestamped backup on every run.
+  Empty entries of X-input pads
   (`045e:028e` – xpad and its clones, `28de:11ff` – Steam Input virtual pad) get the standard
   Xbox 360 layout, other empty entries are removed (SDL's built-in mapping applies), glued
   `platform:Linuxa:b0` entries are fixed.
 
 Then, in Steam → Move or Die → Properties:
 
-- **Controller:** *Disable Steam Input* (only needed for a Steam Controller)
+- **Controller:** *Disable Steam Input*. With Steam Input on, Steam adds its virtual pads
+  (`28de:11ff`, affected by cause 2), which may also duplicate pads the game already sees.
 - **Launch Options:**
 
   ```
   SDL_JOYSTICK_HIDAPI_STEAM=1 SDL_GAMECONTROLLER_IGNORE_DEVICES= %command%
   ```
 
-  `SDL_JOYSTICK_HIDAPI_STEAM=1` lets SDL drive the Steam Controller directly,
-  `SDL_GAMECONTROLLER_IGNORE_DEVICES=` clears the list Steam sets, which hides the real
-  Steam Controller (`0x28de/0x1106`).
+  `SDL_JOYSTICK_HIDAPI_STEAM=1` lets SDL drive the Steam Controller directly.
+  `SDL_GAMECONTROLLER_IGNORE_DEVICES` replaces the list Steam sets, which hides the real
+  Steam Controller (`0x28de/0x1106`) from the game completely.
 
   If some non-gamepad device shows up as a joystick (e.g. the ErgoDox EZ "System Control"
-  interface, `3297:4975`), hide it with `SDL_JOYSTICK_BLACKLIST_DEVICES=0x3297/0x4975`
-  (comma-separated `0xVID/0xPID` list). `SDL_GAMECONTROLLER_IGNORE_DEVICES` doesn't hide plain
-  joysticks.
+  interface, `3297:4975`), put it into that list instead of leaving it empty
+  (comma-separated `0xVID/0xPID`):
+
+  ```
+  SDL_JOYSTICK_HIDAPI_STEAM=1 SDL_GAMECONTROLLER_IGNORE_DEVICES=0x3297/0x4975 %command%
+  ```
+
+  `SDL_JOYSTICK_BLACKLIST_DEVICES=0x3297/0x4975` works as well.
 
 Notes:
 
@@ -88,7 +98,9 @@ Notes:
   `./fix.sh` again.
 - Tested with 2× 8BitDo SN30 Pro (Bluetooth, X-input), Steam Controller (BLE) and SPEEDLINK
   TORID (X-input receiver, `045e:028e`) at the same time, Steam Linux Runtime soldier
-  2.0.20261021, Arch Linux.
+  2.0.20261021, Arch Linux. In that test the game was started directly in the Steam Linux
+  Runtime with the variables above; starting it from Steam with the settings above is not
+  tested yet.
 
 No game files are distributed in this repository.
 
@@ -120,5 +132,7 @@ reagujú v mapovaní ovládania, ale na výbere hráča sa pridať nedajú.
 **Riešenie:** `./fix.sh` odsunie pribalenú SDL (hra potom použije SDL 2.32 zo Steam Runtime)
 a opraví `usercontrollerdb.txt` (so zálohou). V Steame vypni pre hru Steam Input a do Launch
 Options daj `SDL_JOYSTICK_HIDAPI_STEAM=1 SDL_GAMECONTROLLER_IGNORE_DEVICES= %command%`.
+Zariadenie, ktoré hra považuje za joystick, hoci ním nie je (napr. ErgoDox `3297:4975`),
+skryješ tak, že ho dáš do toho zoznamu: `SDL_GAMECONTROLLER_IGNORE_DEVICES=0x3297/0x4975`.
 Mapovanie ovládania v hre nepoužívaj. Po update hry alebo overení súborov v Steame spusti
-skript znova. Návrat: `./fix.sh --restore`.
+skript znova. Návrat: `./fix.sh --restore` (vráti SDL aj mapovania spred prvého spustenia).

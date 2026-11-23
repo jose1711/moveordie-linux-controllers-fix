@@ -40,25 +40,32 @@ fi
 
 if (( restore )); then
     if [[ -f $lib.orig ]]; then
-        mv "$lib.orig" "$lib"; echo "Restored bundled SDL: $lib"
+        mv -f "$lib.orig" "$lib"; echo "Restored bundled SDL: $lib"
     else
         echo "No $lib.orig (nothing to restore, or Steam already put the file back)."
     fi
-    last=$(ls -1t "$DB".bak-* 2>/dev/null | head -1 || true)
-    if [[ -n $last ]]; then
-        cp -p "$last" "$DB"; echo "Restored $DB from $last"
+    if [[ -f $DB.orig ]]; then
+        cp -p "$DB.orig" "$DB"; echo "Restored $DB from $DB.orig (state before the first ./fix.sh)"
     fi
     exit 0
 fi
 
+sha() { sha256sum "$1" | cut -d' ' -f1; }
+
 # 1. bundled SDL
 if [[ -f $lib ]]; then
-    have=$(sha256sum "$lib" | cut -d' ' -f1)
-    if [[ $have != "$ORIG_SDL_SHA" ]]; then
+    if [[ $(sha "$lib") != "$ORIG_SDL_SHA" ]]; then
         echo "Unknown version of $lib (game was updated?). Not touching it." >&2; exit 1
     fi
-    mv -n "$lib" "$lib.orig"
-    echo "Moved bundled SDL aside: $lib.orig"
+    if [[ -f $lib.orig ]]; then
+        # Steam put the file back (update / Verify integrity), the backup already exists
+        [[ $(sha "$lib.orig") == "$ORIG_SDL_SHA" ]] || { echo "$lib.orig has unexpected content, not touching anything." >&2; exit 1; }
+        rm -f "$lib"
+        echo "Removed bundled SDL restored by Steam (backup already in $lib.orig)"
+    else
+        mv "$lib" "$lib.orig"
+        echo "Moved bundled SDL aside: $lib.orig"
+    fi
 elif [[ -f $lib.orig ]]; then
     echo "Bundled SDL already moved aside."
 else
@@ -67,6 +74,7 @@ fi
 
 # 2. usercontrollerdb.txt
 if [[ -f $DB ]]; then
+    [[ -f $DB.orig ]] || cp -p "$DB" "$DB.orig"      # state before the first run, used by --restore
     bak=$DB.bak-$(date +%Y%m%d-%H%M%S)
     cp -p "$DB" "$bak"
     python3 -I - "$DB" <<'EOF'
@@ -108,9 +116,10 @@ fi
 
 cat <<'EOT'
 
-Done. For a Steam Controller also set in Steam > Move or Die > Properties:
+Done. Also set in Steam > Move or Die > Properties:
   Controller:     Disable Steam Input
   Launch Options: SDL_JOYSTICK_HIDAPI_STEAM=1 SDL_GAMECONTROLLER_IGNORE_DEVICES= %command%
+(see README.md for hiding non-gamepad devices that show up as joysticks)
 Avoid the in-game "controller mapping" screen, it writes broken mappings again
 (just run ./fix.sh again if it happens).
 EOT
